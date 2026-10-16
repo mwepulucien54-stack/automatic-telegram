@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#1877f2"><title>Lucien</title>
+<style>
+:root{--blue:#1877f2;--bg:#f0f2f5;--card:#fff;--ink:#1c1e21;--muted:#65676b;--line:#dddfe2}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font:16px Arial,sans-serif;color:var(--ink)}button,input,textarea{font:inherit}button{border:0;border-radius:8px;padding:10px 13px;font-weight:700;cursor:pointer}.blue{background:var(--blue);color:#fff}.gray{background:#e4e6eb;color:#111}.danger{background:#ffe6e6;color:#9b111e}.hidden{display:none!important}.muted{color:var(--muted);font-size:13px}
+header{position:sticky;top:0;z-index:3;background:#fff;box-shadow:0 1px 5px #0002;padding:10px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}.logo{font-size:25px;font-weight:800;color:var(--blue)}header input{flex:1;min-width:150px;border:0;background:var(--bg);padding:11px 15px;border-radius:24px}.nav{display:flex;gap:6px;flex-wrap:wrap}
+main{max-width:760px;margin:20px auto;padding:0 12px 80px}.card,.post{background:var(--card);border-radius:12px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px #0001}.auth{max-width:430px;margin:8vh auto;padding:18px}.auth h1{color:var(--blue);font-size:36px}.auth input,.auth textarea,.card textarea,.card input{width:100%;padding:12px;margin:6px 0;border:1px solid var(--line);border-radius:8px}.auth button{width:100%;margin-top:8px}.posthead{display:flex;gap:10px;align-items:center}.avatar{width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:#dbeafe;color:#174ea6;font-weight:bold;flex-shrink:0}.posttext{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.45;margin:14px 0}.post img{max-width:100%;max-height:460px;object-fit:contain;border-radius:8px}.actions{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:8px;flex-wrap:wrap}.actions button{background:transparent;color:var(--muted)}.comment{background:var(--bg);padding:9px 12px;border-radius:14px;margin:8px 0;overflow-wrap:anywhere}.row{display:flex;gap:8px;align-items:center}.row input{flex:1;min-width:0}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.status{padding:10px;border-radius:8px;background:#fff3cd;margin:10px 0;font-size:13px}.sectiontitle{margin:4px 0 12px}
+@media(max-width:600px){header{padding:8px}.logo{font-size:21px}main{margin:10px auto;padding:0 8px 75px}.card,.post{padding:12px}}
+</style>
+</head>
+<body>
+<section id="authView" class="card auth">
+<h1>Lucien</h1><p>Connectez-vous, partagez et échangez à distance.</p>
+<div class="tabs"><button id="loginTab" class="blue">Connexion</button><button id="registerTab" class="gray">Créer un compte</button></div>
+<form id="authForm">
+<input id="name" placeholder="Nom complet" maxlength="60" class="hidden">
+<input id="email" type="email" placeholder="Adresse e-mail" autocomplete="email" required>
+<input id="password" type="password" placeholder="Mot de passe (8 caractères minimum)" minlength="8" autocomplete="current-password" required>
+<button id="authSubmit" class="blue" type="submit">Se connecter</button>
+</form><p id="authMessage" role="status" class="muted"></p>
+<div class="status">Les comptes, publications et messages sont partagés en ligne après configuration Firebase. N'utilisez pas de mot de passe que vous utilisez ailleurs.</div>
+</section>
+<div id="appView" class="hidden">
+<header><div class="logo">Lucien</div><input id="search" placeholder="Rechercher une publication"><nav class="nav"><button class="gray" data-view="feed">Accueil</button><button class="gray" data-view="people">Membres</button><button class="gray" data-view="chat">Messages</button><button class="gray" data-view="profile">Profil</button></nav><button id="logout" class="gray">Déconnexion</button></header>
+<main>
+<div id="notice" class="muted"></div>
+<section id="feedView">
+<div class="card"><h3 class="sectiontitle">Créer une publication</h3><textarea id="postText" rows="3" maxlength="3000" placeholder="Quoi de neuf ?"></textarea><input id="postImage" type="url" placeholder="URL d'une image (facultatif)"><button id="publish" class="blue">Publier</button></div>
+<div id="posts"></div>
+</section>
+<section id="peopleView" class="hidden"><div class="card"><h2>Membres</h2><p class="muted">Recherchez un membre et ouvrez une conversation privée.</p><div id="people"></div></div></section>
+<section id="chatView" class="hidden"><div class="card"><h2>Messages privés</h2><label for="chatPerson">Choisir un membre</label><select id="chatPerson" style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px"></select><div id="chatMessages" style="padding:10px 0;max-height:50vh;overflow:auto"></div><form id="chatForm" class="row"><input id="chatText" maxlength="2000" placeholder="Écrire un message…" required><button class="blue">Envoyer</button></form></div></section>
+<section id="profileView" class="hidden"><div class="card"><h2>Mon profil</h2><p id="profileEmail" class="muted"></p><input id="profileName" maxlength="60" placeholder="Nom affiché"><textarea id="profileBio" maxlength="300" placeholder="Biographie"></textarea><button id="saveProfile" class="blue">Enregistrer le profil</button></div></section>
+</main></div>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+import { getFirestore, collection, addDoc, doc, setDoc, getDoc, getDocs, query, orderBy, limit, onSnapshot, updateDoc, arrayUnion, arrayRemove, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+/* REMPLACEZ les valeurs ci-dessous par celles de votre projet Firebase. */
+const firebaseConfig = {
+  apiKey: "VOTRE_API_KEY",
+  authDomain: "VOTRE_PROJET.firebaseapp.com",
+  projectId: "VOTRE_PROJECT_ID",
+  storageBucket: "VOTRE_PROJET.appspot.com",
+  messagingSenderId: "VOTRE_MESSAGING_SENDER_ID",
+  appId: "VOTRE_APP_ID"
+};
+const $ = id => document.getElementById(id);
+const authView=$('authView'), appView=$('appView');
+let app,auth,db,registering=false,activeUser=null,stopPosts=null,stopChat=null,selectedChat='',usersCache=[];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const initials=s=>(s||'?').trim().charAt(0).toUpperCase();
+function message(text){$('authMessage').textContent=text}
+function showView(name){for(const n of ['feed','people','chat','profile'])$(n+'View').classList.toggle('hidden',n!==name);if(name==='people')loadPeople();if(name==='chat')loadChat();if(name==='profile')loadProfile()}
+function ensureConfigured(){if(firebaseConfig.apiKey.startsWith('VOTRE_')||firebaseConfig.projectId==='VOTRE_PROJECT_ID'){message('Configuration nécessaire : ajoutez les paramètres de votre projet Firebase dans le code.');return false}return true}
+try { if(ensureConfigured()){app=initializeApp(firebaseConfig);auth=getAuth(app);db=getFirestore(app);setup()} } catch(e){message('Erreur de configuration Firebase : '+e.message)}
+$('loginTab').onclick=()=>{registering=false;$('name').classList.add('hidden');$('authSubmit').textContent='Se connecter';$('loginTab').className='blue';$('registerTab').className='gray';message('')};
+$('registerTab').onclick=()=>{registering=true;$('name').classList.remove('hidden');$('name').required=true;$('authSubmit').textContent='Créer mon compte';$('loginTab').className='gray';$('registerTab').className='blue';message('')};
+$('authForm').onsubmit=async e=>{e.preventDefault();if(!ensureConfigured())return;const email=$('email').value.trim(),password=$('password').value;try{if(registering){const name=$('name').value.trim();const cred=await createUserWithEmailAndPassword(auth,email,password);await updateProfile(cred.user,{displayName:name});await setDoc(doc(db,'users',cred.user.uid),{name,email,bio:'',createdAt:serverTimestamp()});}else await signInWithEmailAndPassword(auth,email,password)}catch(err){message(humanError(err))}};
+function humanError(e){return ({'auth/email-already-in-use':'Cette adresse e-mail est déjà utilisée.','auth/invalid-email':'Adresse e-mail invalide.','auth/weak-password':'Mot de passe trop faible.','auth/invalid-credential':'Adresse e-mail ou mot de passe incorrect.','auth/network-request-failed':'Connexion Internet indisponible.'})[e.code]||e.message||'Une erreur est survenue.'}
+function setup(){onAuthStateChanged(auth,async user=>{activeUser=user;if(user){authView.classList.add('hidden');appView.classList.remove('hidden');$('notice').textContent='Connecté en tant que '+(user.displayName||user.email);showView('feed');listenPosts()}else{if(stopPosts)stopPosts();if(stopChat)stopChat();authView.classList.remove('hidden');appView.classList.add('hidden')}})}
+$('logout').onclick=()=>signOut(auth);
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>showView(b.dataset.view));
+$('publish').onclick=async()=>{const text=$('postText').value.trim(),imageUrl=$('postImage').value.trim();if(!text&&!imageUrl)return alert('Écrivez un texte ou ajoutez une URL d’image.');try{await addDoc(collection(db,'posts'),{uid:activeUser.uid,name:activeUser.displayName||activeUser.email,text,imageUrl,likes:[],createdAt:serverTimestamp()});$('postText').value='';$('postImage').value=''}catch(e){alert(humanError(e))}};
+function listenPosts(){if(stopPosts)stopPosts();const q=query(collection(db,'posts'),orderBy('createdAt','desc'),limit(100));stopPosts=onSnapshot(q,snap=>{const term=$('search').value.toLowerCase();$('posts').innerHTML=snap.docs.map(d=>({id:d.id,...d.data()})).filter(p=>(p.text||'').toLowerCase().includes(term)||(p.name||'').toLowerCase().includes(term)).map(postHTML).join('')||'<div class="card muted">Aucune publication pour le moment.</div>';wirePosts()},e=>$('posts').innerHTML='<div class="card">Impossible de charger les publications : '+esc(e.message)+'</div>')}
+function postHTML(p){const date=p.createdAt?.toDate?p.createdAt.toDate().toLocaleString('fr-FR'):'À l’instant';return `<article class="post"><div class="posthead"><span class="avatar">${esc(initials(p.name))}</span><div><strong>${esc(p.name||'Membre')}</strong><div class="muted">${esc(date)}</div></div></div><div class="posttext">${esc(p.text||'')}</div>${p.imageUrl?`<img src="${esc(p.imageUrl)}" alt="Image de la publication" loading="lazy" referrerpolicy="no-referrer">`:''}<div class="actions"><button data-like="${p.id}" data-liked="${(p.likes||[]).includes(activeUser.uid)}">${(p.likes||[]).includes(activeUser.uid)?'👍 Aimé':'♡ J’aime'} · ${(p.likes||[]).length}</button><button data-toggle-comment="${p.id}">Commenter</button></div><div id="comments-${p.id}"></div><form class="row" data-comment="${p.id}"><input name="comment" maxlength="1000" placeholder="Écrire un commentaire…" required><button class="gray">Envoyer</button></form></article>`}
+function wirePosts(){document.querySelectorAll('[data-like]').forEach(b=>b.onclick=async()=>{const ref=doc(db,'posts',b.dataset.like);try{await updateDoc(ref,{likes:b.dataset.liked==='true'?arrayRemove(activeUser.uid):arrayUnion(activeUser.uid)})}catch(e){alert(humanError(e))}});document.querySelectorAll('[data-comment]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const text=f.elements.comment.value.trim();if(!text)return;try{await addDoc(collection(db,'posts',f.dataset.comment,'comments'),{uid:activeUser.uid,name:activeUser.displayName||activeUser.email,text,createdAt:serverTimestamp()});f.reset();loadComments(f.dataset.comment)}catch(err){alert(humanError(err))}});document.querySelectorAll('[data-toggle-comment]').forEach(b=>b.onclick=()=>loadComments(b.dataset.toggleComment))}
+async function loadComments(postId){const target=$('comments-'+postId);if(!target)return;try{const snap=await getDocs(query(collection(db,'posts',postId,'comments'),orderBy('createdAt','asc'),limit(100)));target.innerHTML=snap.docs.map(d=>{const c=d.data();return `<div class="comment"><strong>${esc(c.name||'Membre')} :</strong> ${esc(c.text)}</div>`}).join('')}catch(e){target.textContent='Impossible de charger les commentaires.'}}
+$('search').oninput=()=>listenPosts();
+async function loadPeople(){try{const snap=await getDocs(query(collection(db,'users'),limit(100)));usersCache=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.id!==activeUser.uid);$('people').innerHTML=usersCache.map(u=>`<div class="row" style="margin:12px 0"><span class="avatar">${esc(initials(u.name))}</span><div style="flex:1"><strong>${esc(u.name||'Membre')}</strong><div class="muted">${esc(u.bio||'')}</div></div><button class="blue" data-message="${u.id}">Message</button></div>`).join('')||'<p class="muted">Aucun autre membre pour le moment.</p>';document.querySelectorAll('[data-message]').forEach(b=>b.onclick=()=>{selectedChat=b.dataset.message;showView('chat');$('chatPerson').value=selectedChat;loadChat()})}catch(e){$('people').textContent='Erreur : '+e.message}}
+async function loadChat(){try{if(!usersCache.length){const snap=await getDocs(query(collection(db,'users'),limit(100)));usersCache=snap.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.id!==activeUser.uid)}const sel=$('chatPerson'),old=selectedChat||sel.value;sel.innerHTML=usersCache.map(u=>`<option value="${u.id}">${esc(u.name||u.email||'Membre')}</option>`).join('');if(old&&usersCache.some(u=>u.id===old))sel.value=old;selectedChat=sel.value;if(stopChat){stopChat();stopChat=null}if(!selectedChat){$('chatMessages').innerHTML='<p class="muted">Créez un autre compte de test ou attendez qu’un membre rejoigne Lucien.</p>';return}const ids=[activeUser.uid,selectedChat].sort(),chatId=ids.join('_');const q=query(collection(db,'chats',chatId,'messages'),orderBy('createdAt','asc'),limit(200));stopChat=onSnapshot(q,snap=>{$('chatMessages').innerHTML=snap.docs.map(d=>{const m=d.data();const date=m.createdAt?.toDate?m.createdAt.toDate().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):'';return `<div class="comment"><strong>${m.uid===activeUser.uid?'Vous':esc(m.name||'Membre')} :</strong> ${esc(m.text)} <span class="muted">${esc(date)}</span></div>`}).join('');$('chatMessages').scrollTop=$('chatMessages').scrollHeight},e=>$('chatMessages').textContent='Erreur de messagerie : '+e.message)}catch(e){$('chatMessages').textContent='Erreur : '+e.message}}
+$('chatPerson').onchange=()=>{selectedChat=$('chatPerson').value;loadChat()};
+$('chatForm').onsubmit=async e=>{e.preventDefault();const text=$('chatText').value.trim();if(!text||!selectedChat)return;const chatId=[activeUser.uid,selectedChat].sort().join('_');try{await addDoc(collection(db,'chats',chatId,'messages'),{uid:activeUser.uid,name:activeUser.displayName||activeUser.email,text,createdAt:serverTimestamp()});$('chatText').value=''}catch(err){alert(humanError(err))}};
+async function loadProfile(){try{const snap=await getDoc(doc(db,'users',activeUser.uid));const u=snap.exists()?snap.data():{};$('profileEmail').textContent=activeUser.email;$('profileName').value=u.name||activeUser.displayName||'';$('profileBio').value=u.bio||''}catch(e){$('profileEmail').textContent=e.message}}
+$('saveProfile').onclick=async()=>{const name=$('profileName').value.trim();if(!name)return alert('Entrez un nom.');try{await updateProfile(activeUser,{displayName:name});await setDoc(doc(db,'users',activeUser.uid),{name,bio:$('profileBio').value.trim(),email:activeUser.email},{merge:true});$('notice').textContent='Profil enregistré.'}catch(e){alert(humanError(e))}};
+</script>
+</body></html>
